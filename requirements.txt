@@ -1,0 +1,1 @@
+xcore @ git+https://github.com/traoreera/xcore.git

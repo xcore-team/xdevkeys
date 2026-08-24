@@ -1,0 +1,57 @@
+name: xdevkeys
+version: 1.0.0
+author: xcore
+description: >
+  Gestion des clés API et des clés de signature HMAC pour les développeurs.
+  Permet d'authentifier le CLI xcore et de signer les plugins publiés.
+
+execution_mode: trusted
+entry_point: src/main.py
+framework_version: ">=2.1.0"
+
+requires:
+  - name: auth
+    version: ">=1.0.0"
+
+envconfiguration:
+  inject: true
+  env_file: .env
+
+env:
+  DEVKEYS_MASTER_KEY: "${DEVKEYS_MASTER_KEY}"
+  # self.ctx.env n'est PAS os.environ — un plugin ne voit que les clés qu'il
+  # déclare explicitement ici (xcore.sdk.plugin_base: resolved_env ne vient
+  # que de raw.get("env", {})), quelle que soit la variable réellement
+  # présente dans le process. Sans cette déclaration, routes/device.py
+  # (lien de confirmation `xcli login`) retombait silencieusement sur
+  # app_base_url (le backend, :8000) au lieu du frontend — même bug que
+  # app/auth aurait pour ses liens d'invitation/reset s'il ne les
+  # déclarait pas non plus (à vérifier séparément, hors scope ici).
+  WEB_APP_URL: "${WEB_APP_URL}"
+  APP_BASE_URL: "${APP_BASE_URL}"
+
+# Vide = deny_all côté PermissionEngine (voir xcore/kernel/permissions/engine.py
+# — "no permissions declared, deny all") : les actions IPC exposées par ipc.py
+# (devkeys.authenticate, devkeys.get_signing_secret) étaient donc en pratique
+# injoignables par tout autre plugin malgré leur présence dans le code. Même
+# règle que "xauth.*" dans app/auth/plugin.yaml pour son propre namespace IPC.
+permissions:
+  - resource: "devkeys.*"
+    actions: ["*"]
+    effect: allow
+
+resources:
+  timeout_seconds: 30
+  max_memory_mb: 128
+  rate_limit:
+    calls: 200
+    period_seconds: 60
+
+runtime:
+  health_check:
+    enabled: true
+    interval_seconds: 60
+    timeout_seconds: 5
+  retry:
+    max_attempts: 3
+    backoff_seconds: 2.0

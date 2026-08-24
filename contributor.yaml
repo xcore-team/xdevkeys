@@ -1,0 +1,10 @@
+version: "1"
+project: xdevkeys
+description: Gestion des clés API et clés de signature HMAC pour développeurs XCore
+
+maintainers:
+  - name: traoreera
+    github: traoreera
+    role: Lead Maintainer
+
+contributors: []
