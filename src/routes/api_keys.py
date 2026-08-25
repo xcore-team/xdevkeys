@@ -17,15 +17,25 @@ def api_keys_router(db: Any) -> APIRouter:
         body: ApiKeyCreate,
         user: AuthPayload = Depends(get_current_user),
     ) -> Any:
-        """Génère une nouvelle clé API rattachée à un projet — la clé ne
-        pourra installer/déployer QUE la cible de ce projet. Le secret est
-        affiché une seule fois."""
+        """
+        Sans project_id : génère une clé "personnelle" (ApiKeyService.
+        create_personal) — jusqu'ici réservée au flux xcli login, exposée
+        ici pour ne plus obliger un détour par la CLI juste pour ça ; elle
+        n'accorde rien qu'un `xcli login` n'accordait déjà (même self-service,
+        aucune permission élevée des deux côtés).
+        Avec project_id : clé rattachée à ce projet — ne pourra installer/
+        déployer QUE sa cible. Le secret est affiché une seule fois.
+        """
         async with db.session() as session:
             svc = ApiKeyService(session)
             try:
-                record, raw_key, raw_credential = await svc.create(
-                    user_id=user["sub"], name=body.name, project_id=body.project_id
-                )
+                if body.project_id:
+                    record, raw_key, raw_credential = await svc.create(
+                        user_id=user["sub"], name=body.name, project_id=body.project_id
+                    )
+                else:
+                    record, raw_key = await svc.create_personal(user_id=user["sub"], name=body.name)
+                    raw_credential = None
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc))
             await session.commit()
@@ -36,6 +46,7 @@ def api_keys_router(db: Any) -> APIRouter:
                 project_id=record.project_id,
                 prefix=record.prefix,
                 is_active=record.is_active,
+                is_personal=record.is_personal,
                 created_at=record.created_at,
                 last_used_at=record.last_used_at,
                 key=raw_key,
